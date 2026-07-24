@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>키워드 룰렛 · 실시간 방송 룸</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+/* ============ 토큰 ============ */
+:root{
+  --void:#120E1E;
+  --void-2:#17122A;
+  --curtain:#241a37;
+  --curtain-2:#2c2040;
+  --line: rgba(255,243,214,0.09);
+  --gold:#FFC94A;
+  --cerise:#FF3E7F;
+  --bulb:#FFF3D6;
+  --teal:#34D8A6;
+  --violet:#8B6CFF;
+  --amber:#FF7A45;
+  --azure:#4FA6FF;
+  --text:#F3EEFF;
+  --text-dim:#B9AED6;
+  --text-faint:#7C7196;
+  --danger:#FF5D6C;
+  --radius: 18px;
+  --wheel-colors: var(--gold), var(--cerise), var(--violet), var(--teal), var(--amber), var(--azure);
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  min-height:100vh;
+  background: radial-gradient(ellipse at 50% -10%, #3a2a52 0%, var(--void-2) 45%, var(--void) 100%);
+  color:var(--text);
+  font-family:"Pretendard","Apple SD Gothic Neo",sans-serif;
+  overflow-x:hidden;
+}
+.marquee{ font-family:"Black Han Sans","Pretendard",sans-serif; letter-spacing:0.02em; }
+.hidden{ display:none !important; }
+button{ font-family:inherit; cursor:pointer; }
+input{ font-family:inherit; }
+
+/* twinkling bulb backdrop */
+.stage-glow{
+  position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255,201,74,0.10), transparent 40%),
+    radial-gradient(circle at 80% 10%, rgba(255,62,127,0.10), transparent 40%);
+}
+
+.app{ position:relative; z-index:1; min-height:100vh; display:flex; flex-direction:column; }
+
+/* ============ 공통 카드/버튼 ============ */
+.card{
+  background: linear-gradient(180deg, var(--curtain), var(--curtain-2));
+  border:1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.ticket-btn{
+  border:none; border-radius:14px; padding:16px 22px;
+  font-weight:800; font-size:16px; color:var(--void);
+  background: linear-gradient(180deg, var(--gold), #e6a723);
+  box-shadow: 0 8px 0 #a9761a, 0 14px 24px rgba(255,201,74,0.25);
+  transition: transform .08s ease;
+}
+.ticket-btn:active{ transform: translateY(4px); box-shadow: 0 4px 0 #a9761a, 0 8px 16px rgba(255,201,74,0.2); }
+.ticket-btn.secondary{
+  background: linear-gradient(180deg, #3a2c52, #2a2040); color: var(--text);
+  box-shadow: 0 8px 0 #17122a, 0 14px 24px rgba(0,0,0,0.3);
+}
+.ticket-btn.secondary:active{ box-shadow: 0 4px 0 #17122a, 0 8px 16px rgba(0,0,0,0.25); }
+.ticket-btn:disabled{ opacity:.45; cursor:not-allowed; transform:none; }
+.ticket-btn.danger{ background: linear-gradient(180deg, var(--danger), #b8323e); box-shadow:0 8px 0 #7a1f28; color:#fff;}
+
+.link-btn{
+  background:none;border:none;color:var(--text-dim);text-decoration:underline;
+  font-size:13px;padding:4px;
+}
+
+/* ============ 랜딩 ============ */
+#screen-landing{
+  flex:1; display:flex; align-items:center; justify-content:center; padding:32px 16px;
+}
+.landing-wrap{ width:100%; max-width:860px; text-align:center; }
+.landing-title{ font-size:clamp(28px,5vw,44px); color:var(--bulb); margin:0 0 6px; }
+.landing-sub{ color:var(--text-dim); margin:0 0 34px; font-size:15px; }
+.landing-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:640px){ .landing-grid{ grid-template-columns:1fr; } }
+.landing-card{ padding:28px 24px; text-align:left; }
+.landing-card h2{ font-size:18px; margin:0 0 6px; color:var(--gold); }
+.landing-card p{ font-size:13px; color:var(--text-dim); margin:0 0 18px; line-height:1.6; }
+.code-input{
+  width:100%; padding:14px 16px; border-radius:12px; border:1px solid var(--line);
+  background:var(--void); color:var(--bulb); font-size:22px; letter-spacing:0.35em;
+  text-align:center; text-transform:uppercase; margin-bottom:12px; font-weight:800;
+}
+.code-input::placeholder{ letter-spacing:0.15em; color:var(--text-faint); font-weight:400; font-size:14px;}
+.pw-input{
+  width:100%; padding:11px 14px; border-radius:10px; border:1px solid var(--line);
+  background:var(--void); color:var(--text); font-size:13px; margin-bottom:10px;
+}
+.msg-line{ font-size:13px; min-height:18px; margin-top:8px; }
+.msg-line.error{ color:var(--danger); }
+.msg-line.ok{ color:var(--teal); }
+
+/* ============ 룸 화면 ============ */
+#screen-room{ flex:1; padding:20px 16px 60px; }
+.room-shell{ max-width:1120px; margin:0 auto; }
+.room-header{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  flex-wrap:wrap; margin-bottom:18px;
+}
+.room-code-badge{
+  display:flex; align-items:center; gap:10px; padding:8px 14px;
+  background:var(--void); border:1px solid var(--line); border-radius:999px;
+}
+.room-code-badge b{ font-size:18px; letter-spacing:0.2em; color:var(--gold); }
+.copy-btn{
+  border:1px solid var(--line); background:transparent; color:var(--text-dim);
+  border-radius:8px; padding:4px 10px; font-size:12px;
+}
+.copy-btn:hover{ color:var(--bulb); border-color:var(--gold); }
+.header-right{ display:flex; align-items:center; gap:10px; }
+.presence-badge{
+  display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);
+  background:var(--void); border:1px solid var(--line); padding:6px 12px; border-radius:999px;
+}
+.presence-dot{ width:7px;height:7px;border-radius:50%; background:var(--teal); box-shadow:0 0 8px var(--teal); }
+.host-badge{ font-size:11px; color:var(--void); background:var(--teal); padding:3px 9px; border-radius:999px; font-weight:800; }
+.viewer-badge{ font-size:11px; color:var(--text-dim); border:1px solid var(--line); padding:3px 9px; border-radius:999px; }
+
+.room-layout{ display:grid; grid-template-columns: 1.3fr 0.9fr; gap:20px; align-items:start; }
+@media (max-width:860px){ .room-layout{ grid-template-columns:1fr; } }
+
+/* ---- 휠 패널 ---- */
+.wheel-panel{ padding:28px 20px 26px; display:flex; flex-direction:column; align-items:center; }
+/* 버튼 위 여백 확보 */
+.wheel-outer{ position:relative; width:min(78vw,380px); aspect-ratio:1/1; margin-bottom:48px; }
+.bulb-ring{ position:absolute; inset:-14px; pointer-events:none; }
+.bulb{
+  position:absolute; width:7px; height:7px; border-radius:50%;
+  background:var(--bulb); box-shadow:0 0 6px 1px var(--gold);
+  animation: bulb-twinkle 1.8s ease-in-out infinite;
+}
+@keyframes bulb-twinkle{ 0%,100%{ opacity:.35; } 50%{ opacity:1; } }
+.wheel-wrap{ position:absolute; inset:0; border-radius:50%; overflow:hidden;
+  box-shadow: 0 0 0 6px var(--void), 0 0 0 8px rgba(255,201,74,0.25), 0 20px 50px rgba(0,0,0,0.5); }
+.wheel-rotor{ width:100%; height:100%; display:block; transform:rotate(0deg); }
+.wheel-hub{
+  position:absolute; top:50%; left:50%; width:17%; height:17%;
+  transform:translate(-50%,-50%); border-radius:50%;
+  background: radial-gradient(circle at 35% 30%, #fff6dc, var(--gold) 60%, #a9761a 100%);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5), inset 0 0 0 3px rgba(0,0,0,0.15); z-index:3;
+}
+.wheel-pointer{
+  position:absolute; top:-8px; left:50%; transform:translateX(-50%); z-index:4;
+  width:0; height:0; border-left:15px solid transparent; border-right:15px solid transparent;
+  border-top:26px solid var(--cerise); filter:drop-shadow(0 3px 4px rgba(0,0,0,0.5));
+}
+/* 안내 문구 겹침 방지 */
+.wheel-empty-note{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  text-align:center; padding:20px; color:var(--text-dim); font-size:13px; z-index:5; transform: translateY(60px); }
+
+.spin-controls{ display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; max-width:320px; }
+.spin-btn{ width:100%; padding:18px; font-size:18px; border-radius:16px; position:relative;
+  background: linear-gradient(180deg, var(--cerise), #c22459); color:#fff;
+  box-shadow: 0 10px 0 #7d1637, 0 16px 28px rgba(255,62,127,0.3); border:none; font-weight:800;}
+.spin-btn:active{ transform:translateY(5px); box-shadow:0 5px 0 #7d1637, 0 10px 18px rgba(255,62,127,0.25); }
+.spin-btn:disabled{ opacity:.5; }
+.viewer-hint{ font-size:12px; color:var(--text-faint); text-align:center; }
+
+/* 결과창 상단 여백 확보하여 버튼과 겹침 방지 */
+.reveal-wrap{ min-height:70px; display:flex; align-items:center; justify-content:center; width:100%; margin-top:20px; }
+.reveal-card{
+  padding:14px 26px; border-radius:14px; text-align:center;
+  background: linear-gradient(180deg, rgba(255,201,74,0.16), rgba(255,201,74,0.04));
+  border:1px solid rgba(255,201,74,0.4);
+  animation: reveal-pop .5s cubic-bezier(.2,1.4,.4,1);
+}
+@keyframes reveal-pop{ 0%{ transform:scale(.7); opacity:0;} 60%{ transform:scale(1.08);} 100%{ transform:scale(1); opacity:1;} }
+.reveal-label{ font-size:11px; letter-spacing:.15em; color:var(--gold); margin-bottom:4px; }
+.reveal-text{ font-size:clamp(22px,4vw,30px); color:var(--bulb); }
+
+/* ---- 사이드 패널 ---- */
+.side-panel{ padding:22px 20px; display:flex; flex-direction:column; gap:18px; }
+.side-title{ font-size:14px; color:var(--gold); margin:0; letter-spacing:.05em; }
+.kw-form{ display:flex; gap:8px; }
+.kw-form input{
+  flex:1; padding:11px 12px; border-radius:10px; border:1px solid var(--line);
+  background:var(--void); color:var(--text); font-size:14px;
+}
+.kw-form button{
+  padding:0 16px; border-radius:10px; border:none; background:var(--gold); color:var(--void);
+  font-weight:800; font-size:13px;
+}
+.kw-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;
+  max-height:260px; overflow-y:auto; }
+.kw-item{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:9px 12px; border-radius:10px; background:var(--void); border:1px solid var(--line);
+  font-size:13px;
+}
+.kw-item.used{ opacity:.4; text-decoration:line-through; }
+.kw-swatch{ width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-right:8px; }
+.kw-item-main{ display:flex; align-items:center; overflow:hidden; }
+.kw-item-main span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.kw-remove{ background:none; border:none; color:var(--text-faint); font-size:15px; line-height:1; padding:2px 4px; }
+.kw-remove:hover{ color:var(--danger); }
+.empty-kw{ font-size:12px; color:var(--text-faint); padding:10px 2px; }
+
+.toggle-row{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:10px 12px; background:var(--void); border:1px solid var(--line); border-radius:10px; }
+.toggle-row span{ font-size:13px; color:var(--text-dim); }
+.switch{ position:relative; width:42px; height:24px; flex-shrink:0; }
+.switch input{ opacity:0; width:0; height:0; }
+.switch label{ position:absolute; inset:0; background:#3a2c52; border-radius:999px; cursor:pointer; transition:.2s; }
+.switch label::after{ content:""; position:absolute; width:18px; height:18px; border-radius:50%;
+  background:#fff; top:3px; left:3px; transition:.2s; }
+.switch input:checked + label{ background:var(--teal); }
+.switch input:checked + label::after{ transform:translateX(18px); }
+.switch input:disabled + label{ opacity:.4; cursor:not-allowed; }
+
+.mini-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+.mini-btn{
+  flex:1; padding:9px; border-radius:9px; border:1px solid var(--line); background:transparent;
+  color:var(--text-dim); font-size:12px; white-space:nowrap;
+}
+.mini-btn:hover{ border-color:var(--gold); color:var(--bulb); }
+.leave-btn{ color:var(--danger); border-color:rgba(255,93,108,0.3); }
+.danger-mini{ color:var(--danger); border-color:rgba(255,93,108,0.3); }
+.danger-mini:hover{ border-color:var(--danger); color:#fff; }
+
+.random-kw-box{
+  margin-top:10px; padding:10px; border-radius:10px; border:1px dashed var(--line); background:rgba(255,201,74,0.04);
+}
+.random-kw-label{ font-size:11px; color:var(--text-dim); margin-bottom:8px; }
+.random-kw-row{ display:flex; gap:6px; align-items:center; }
+.random-kw-row .mini-btn{ flex:1; }
+.count-input{
+  width:48px; flex:0 0 48px; text-align:center; padding:8px 4px; border-radius:9px;
+  border:1px solid var(--line); background:var(--void); color:var(--text); font-size:12px;
+}
+
+.footer-hint{ text-align:center; color:var(--text-faint); font-size:11px; margin-top:26px; }
+
+/* ---- setup overlay ---- */
+.setup-overlay{
+  position:fixed; inset:0; background:rgba(10,7,18,0.92); z-index:50;
+  display:flex; align-items:center; justify-content:center; padding:20px;
+}
+.setup-card{ max-width:520px; padding:28px; }
+.setup-card h2{ color:var(--gold); margin-top:0; }
+.setup-card ol{ color:var(--text-dim); font-size:13px; line-height:1.9; padding-left:20px; }
+.setup-card code{ background:var(--void); padding:2px 6px; border-radius:4px; color:var(--bulb); }
+</style>
+</head>
+<body>
+
+<div class="stage-glow"></div>
+
+<!-- Firebase 설정이 비어있을 때 표시되는 안내 오버레이 -->
+<div id="setup-overlay" class="setup-overlay hidden">
+  <div class="card setup-card">
+    <h2 class="marquee">Firebase 설정이 필요해요</h2>
+    <p style="color:var(--text-dim);font-size:13px;">
+      이 도구는 실시간 동기화를 위해 무료 Firebase Realtime Database를 사용합니다.
+      파일 상단의 <code>FIREBASE_CONFIG</code> 값을 본인의 Firebase 프로젝트 정보로 채워주세요.
+    </p>
+    <ol>
+      <li><a href="https://console.firebase.google.com" target="_blank" style="color:var(--gold);">Firebase 콘솔</a>에서 새 프로젝트 생성</li>
+      <li>왼쪽 메뉴 <code>빌드 → Realtime Database</code> 에서 데이터베이스 생성 (테스트 모드)</li>
+      <li>프로젝트 설정 → 일반 → 내 앱 → 웹 앱 추가 후 <code>firebaseConfig</code> 복사</li>
+      <li>이 HTML 파일 상단의 FIREBASE_CONFIG 부분에 붙여넣기</li>
+    </ol>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- ============ 랜딩 화면 ============ -->
+  <section id="screen-landing">
+    <div class="landing-wrap">
+      <h1 class="landing-title marquee">🎪 키워드 룰렛 룸</h1>
+      <p class="landing-sub">방을 만들고 코드를 공유하면, 룰렛 연출과 결과가 참가자 전원에게 실시간으로 보여져요.</p>
+      <div class="landing-grid">
+        <div class="card landing-card">
+          <h2>방 만들기</h2>
+          <p>호스트가 되어 룰렛에 키워드를 채워넣고 방송 중 돌려보세요.</p>
+          <input id="create-password-input" class="pw-input" maxlength="20" placeholder="참가 비밀번호 (선택, 비워두면 없음)">
+          <button id="btn-create-room" class="ticket-btn" style="width:100%;">방 만들기</button>
+        </div>
+        <div class="card landing-card">
+          <h2>방 참가하기</h2>
+          <p>호스트에게 받은 코드를 입력하면 같은 화면을 실시간으로 볼 수 있어요.</p>
+          <input id="join-code-input" class="code-input" maxlength="5" placeholder="코드 입력">
+          <div id="join-password-row" class="hidden">
+            <input id="join-password-input" class="pw-input" maxlength="20" placeholder="비밀번호">
+          </div>
+          <button id="btn-join-room" class="ticket-btn secondary" style="width:100%;">입장하기</button>
+          <div id="join-msg" class="msg-line error"></div>
+        </div>
+      </div>
+      <p class="footer-hint">활동이 없는 방은 3시간 뒤 자동으로 정리됩니다. 방 코드를 모르면 다른 사람은 방을 찾을 수도 없어요.</p>
+    </div>
+  </section>
+
+  <!-- ============ 룸 화면 ============ -->
+  <section id="screen-room" class="hidden">
+    <div class="room-shell">
+      <div class="room-header">
+        <div class="room-code-badge">
+          <span style="font-size:12px;color:var(--text-dim);">방 코드</span>
+          <b id="room-code-text">-----</b>
+          <button id="btn-copy-code" class="copy-btn">복사</button>
+          <button id="btn-copy-invite" class="copy-btn hidden">초대 링크 복사</button>
+        </div>
+        <div class="header-right">
+          <span id="role-badge" class="viewer-badge">참가자</span>
+          <div class="presence-badge"><span class="presence-dot"></span><span id="presence-count">1</span>명 접속중</div>
+        </div>
+      </div>
+
+      <div class="room-layout">
+        <!-- 휠 -->
+        <div class="card wheel-panel">
+          <div class="wheel-outer">
+            <div class="bulb-ring" id="bulb-ring"></div>
+            <div class="wheel-wrap">
+              <svg id="wheel-svg" class="wheel-rotor" viewBox="0 0 400 400"></svg>
+              <div id="wheel-empty-note" class="wheel-empty-note">키워드를 추가하면<br>룰렛이 만들어져요</div>
+            </div>
+            <div class="wheel-hub"></div>
+            <div class="wheel-pointer"></div>
+          </div>
+
+          <div class="spin-controls">
+            <button id="btn-spin" class="ticket-btn spin-btn">🎯 룰렛 돌리기</button>
+            <div id="viewer-hint" class="viewer-hint hidden">호스트가 룰렛을 돌리면 여기에도 함께 보여요</div>
+          </div>
+
+          <div class="reveal-wrap">
+            <div id="reveal-card" class="reveal-card hidden">
+              <div class="reveal-label">결과</div>
+              <div id="reveal-text" class="reveal-text marquee">-</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 사이드 패널 -->
+        <div class="card side-panel">
+          <div>
+            <p class="side-title">키워드 목록</p>
+            <div id="host-kw-controls">
+              <form id="kw-form" class="kw-form">
+                <input id="kw-input" maxlength="24" placeholder="키워드 입력 후 추가">
+                <button type="submit">추가</button>
+              </form>
+
+              <div class="random-kw-box">
+                <div class="random-kw-label">🎲 무난한 주제로 랜덤 추가</div>
+                <div class="random-kw-row">
+                  <button type="button" id="btn-random-one" class="mini-btn">랜덤 1개 추가</button>
+                  <input type="number" id="random-count-input" class="count-input" value="5" min="1" max="30">
+                  <button type="button" id="btn-random-many" class="mini-btn">여러 개 추가</button>
+                </div>
+              </div>
+            </div>
+            <ul id="kw-list" class="kw-list"></ul>
+          </div>
+          
+          <!-- 당첨 기록 패널 -->
+          <div style="margin-top: 24px;">
+            <p class="side-title">당첨 기록</p>
+            <ul id="history-list" class="kw-list" style="margin-top:10px; background:var(--void-2); padding:12px; border-radius:12px;">
+              <li class="empty-kw">아직 룰렛을 돌리지 않았어요.</li>
+            </ul>
+          </div>
+
+          <div id="host-only-panel">
+            <div class="toggle-row">
+              <span>이미 나온 키워드 중복 방지</span>
+              <div class="switch">
+                <input type="checkbox" id="toggle-noDup">
+                <label for="toggle-noDup"></label>
+              </div>
+            </div>
+            <div class="mini-actions" style="margin-top:10px;">
+              <button id="btn-reset-used" class="mini-btn">사용 이력 초기화</button>
+              <button id="btn-clear-all" class="mini-btn danger-mini">키워드 전체 삭제</button>
+            </div>
+          </div>
+
+          <button id="btn-leave" class="mini-btn leave-btn">방 나가기</button>
+        </div>
+      </div>
+
+      <p class="footer-hint">3시간 동안 아무 활동이 없으면 이 방은 자동으로 삭제돼요.</p>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* =========================================================
+   1) Firebase 설정
+   ========================================================= */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBt5ASs_NvkoErNFu4rb08GVrQfcGhVpPk",
+  authDomain: "randomkeyword-html.firebaseapp.com",
+  databaseURL: "https://randomkeyword-html-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "randomkeyword-html",
+};
+
+const isConfigured = FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.startsWith("YOUR_");
+if(!isConfigured){
+  document.getElementById('setup-overlay').classList.remove('hidden');
+}
+
+let db = null;
+if(isConfigured){
+  if(typeof firebase === 'undefined'){
+    const overlay = document.getElementById('setup-overlay');
+    overlay.classList.remove('hidden');
+    overlay.querySelector('.setup-card').innerHTML = `
+      <h2 class="marquee">Firebase 스크립트를 불러오지 못했어요</h2>
+      <p style="color:var(--text-dim);font-size:13px;">
+        FIREBASE_CONFIG는 정상인데, Firebase SDK 자체가 로드되지 않았어요. 아래를 확인해주세요.
+      </p>
+      <ol>
+        <li>광고/추적 차단 확장 프로그램을 꺼보거나 시크릿 모드로 다시 열어보세요</li>
+        <li>개발자 도구(F12) → Network 탭에서 <code>firebase-app-compat.js</code> 요청이 실패(빨간색)했는지 확인해보세요</li>
+        <li>파일 &lt;head&gt;의 두 &lt;script src="...gstatic.com..."&gt; 태그가 그대로 있는지 확인해보세요</li>
+        <li>인터넷 연결 상태를 확인해보세요</li>
+      </ol>`;
+  } else {
+    try{
+      firebase.initializeApp(FIREBASE_CONFIG);
+      db = firebase.database();
+    }catch(e){
+      alert('Firebase 초기화에 실패했어요: ' + e.message);
+    }
+  }
+}
+
+/* =========================================================
+   2) 상태
+   ========================================================= */
+const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
+const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const WHEEL_COLORS = ["#FFC94A","#FF3E7F","#8B6CFF","#34D8A6","#FF7A45","#4FA6FF"];
+
+const state = {
+  code: null,
+  isHost: false,
+  hostToken: null,
+  password: null,
+  keywords: [],
+  usedIds: {},
+  noDuplicate: false,
+  myRotation: 0,
+  spinning: false,
+  lastSpinId: null,
+  clientId: Math.random().toString(36).slice(2) + Date.now().toString(36),
+};
+
+const el = (id) => document.getElementById(id);
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* =========================================================
+   3) 화면 전환
+   ========================================================= */
+function showLanding(){
+  el('screen-room').classList.add('hidden');
+  el('screen-landing').classList.remove('hidden');
+}
+function showRoom(){
+  el('screen-landing').classList.add('hidden');
+  el('screen-room').classList.remove('hidden');
+}
+
+/* =========================================================
+   4) 방 코드 생성 + 만료 정리
+   ========================================================= */
+function generateCode(){
+  let out = "";
+  for(let i=0;i<5;i++) out += CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)];
+  return out;
+}
+
+async function generateUniqueCode(){
+  for(let attempt=0; attempt<10; attempt++){
+    const code = generateCode();
+    const snap = await db.ref('rooms/' + code).get();
+    if(!snap.exists()) return code;
+    const data = snap.val();
+    if(Date.now() - (data.lastActivity || 0) > ROOM_TTL_MS){
+      await db.ref('rooms/' + code).remove();
+      return code;
+    }
+  }
+  return generateCode() + Math.floor(Math.random()*9);
+}
+
+/* =========================================================
+   5) 방 생성 / 참가
+   ========================================================= */
+async function createRoom(){
+  if(!requireDb()) return;
+  el('btn-create-room').disabled = true;
+  const code = await generateUniqueCode();
+  const hostToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const password = el('create-password-input').value.trim();
+
+  await db.ref('rooms/' + code).set({
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    lastActivity: firebase.database.ServerValue.TIMESTAMP,
+    hostToken,
+    password: password || null,
+    noDuplicate: false,
+    keywords: {},
+    usedIds: {},
+    spin: null,
+  });
+
+  localStorage.setItem('kwroulette:' + code, hostToken);
+  el('btn-create-room').disabled = false;
+  state.password = password || null;
+  enterRoom(code, true, hostToken);
+}
+
+async function joinRoomByCode(rawCode, rawPassword){
+  if(!requireDb()) return;
+  const code = (rawCode || '').trim().toUpperCase();
+  const msgEl = el('join-msg');
+  msgEl.textContent = '';
+  msgEl.className = 'msg-line error';
+
+  if(code.length < 4){ msgEl.textContent = '방 코드를 정확히 입력해주세요.'; return; }
+
+  el('btn-join-room').disabled = true;
+  const snap = await db.ref('rooms/' + code).get();
+  el('btn-join-room').disabled = false;
+
+  if(!snap.exists()){
+    msgEl.textContent = '존재하지 않거나 만료된 방이에요.';
+    return;
+  }
+  const data = snap.val();
+  if(Date.now() - (data.lastActivity || 0) > ROOM_TTL_MS){
+    await db.ref('rooms/' + code).remove();
+    msgEl.textContent = '만료되어 삭제된 방이에요.';
+    return;
+  }
+
+  const savedToken = localStorage.getItem('kwroulette:' + code);
+  const isHost = !!savedToken && savedToken === data.hostToken;
+
+  if(!isHost && data.password){
+    const inputPw = (rawPassword || '').trim();
+    if(!inputPw){
+      msgEl.textContent = '이 방은 비밀번호가 필요해요.';
+      el('join-password-row').classList.remove('hidden');
+      return;
+    }
+    if(inputPw !== data.password){
+      msgEl.textContent = '비밀번호가 올바르지 않아요.';
+      el('join-password-row').classList.remove('hidden');
+      return;
+    }
+  }
+
+  state.password = data.password || null;
+  enterRoom(code, isHost, isHost ? savedToken : null);
+}
+
+function requireDb(){
+  if(!db){
+    alert('Firebase 설정이 필요합니다. 파일 상단의 FIREBASE_CONFIG를 채워주세요.');
+    return false;
+  }
+  return true;
+}
+
+/* =========================================================
+   6) 방 입장 및 리스너
+   ========================================================= */
+let roomRef = null;
+
+function enterRoom(code, isHost, hostToken){
+  state.code = code;
+  state.isHost = isHost;
+  state.hostToken = hostToken;
+  state.myRotation = 0;
+  state.lastSpinId = null;
+
+  el('room-code-text').textContent = code;
+  el('role-badge').textContent = isHost ? '호스트' : '참가자';
+  el('role-badge').className = isHost ? 'host-badge' : 'viewer-badge';
+  el('host-kw-controls').classList.toggle('hidden', !isHost);
+  el('host-only-panel').classList.toggle('hidden', !isHost);
+  el('btn-spin').classList.toggle('hidden', !isHost);
+  el('viewer-hint').classList.toggle('hidden', isHost);
+  el('btn-copy-invite').classList.toggle('hidden', !isHost);
+  el('toggle-noDup').disabled = !isHost;
+
+  showRoom();
+  buildBulbRing();
+
+  roomRef = db.ref('rooms/' + code);
+  roomRef.on('value', (snap) => {
+    if(!snap.exists()){
+      alert('호스트가 방을 종료했거나 방이 만료되었어요.');
+      leaveRoom();
+      return;
+    }
+    const data = snap.val();
+    state.keywords = data.keywords ? Object.entries(data.keywords).map(([id, text]) => ({id, text})) : [];
+    state.usedIds = data.usedIds || {};
+    state.noDuplicate = !!data.noDuplicate;
+    state.password = data.password || null;
+    el('toggle-noDup').checked = state.noDuplicate;
+    renderKeywordList();
+    renderWheel();
+    if(data.spin && data.spin.spinId && data.spin.spinId !== state.lastSpinId){
+      state.lastSpinId = data.spin.spinId;
+      playSpin(data.spin);
+    }
+  });
+
+  setupPresence(code);
+  touchActivity();
+}
+
+function leaveRoom(){
+  if(roomRef) roomRef.off();
+  if(presenceRef) presenceRef.remove();
+  roomRef = null;
+  state.code = null;
+  showLanding();
+}
+
+/* =========================================================
+   7) presence(접속자 수)
+   ========================================================= */
+let presenceRef = null;
+function setupPresence(code){
+  presenceRef = db.ref('rooms/' + code + '/participants/' + state.clientId);
+  presenceRef.set(true);
+  presenceRef.onDisconnect().remove();
+  db.ref('rooms/' + code + '/participants').on('value', (snap) => {
+    const count = snap.exists() ? Object.keys(snap.val()).length : 0;
+    el('presence-count').textContent = Math.max(count, 1);
+  });
+}
+
+/* =========================================================
+   8) 활동 시간 갱신 (자동 삭제용)
+   ========================================================= */
+function touchActivity(){
+  if(!state.code) return;
+  db.ref('rooms/' + state.code + '/lastActivity').set(firebase.database.ServerValue.TIMESTAMP);
+}
+
+/* =========================================================
+   9) 키워드 관리 (호스트)
+   ========================================================= */
+function addKeyword(text){
+  const clean = text.trim();
+  if(!clean || !state.isHost) return;
+  const id = 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+  db.ref('rooms/' + state.code + '/keywords/' + id).set(clean);
+  touchActivity();
+}
+
+function removeKeyword(id){
+  if(!state.isHost) return;
+  db.ref('rooms/' + state.code + '/keywords/' + id).remove();
+  db.ref('rooms/' + state.code + '/usedIds/' + id).remove();
+  touchActivity();
+}
+
+function clearAllKeywords(){
+  if(!state.isHost) return;
+  if(state.keywords.length === 0) return;
+  if(!confirm('키워드 ' + state.keywords.length + '개를 모두 삭제할까요?')) return;
+  db.ref('rooms/' + state.code + '/keywords').set({});
+  db.ref('rooms/' + state.code + '/usedIds').set({});
+  touchActivity();
+}
+
+const SAFE_KEYWORD_POOL = [
+  "떡볶이","김밥","라면","피자","초밥","치킨","파스타","붕어빵","마라탕","샌드위치","호떡","냉면","삼겹살","타코","팬케이크",
+  "강아지","고양이","판다","펭귄","토끼","여우","수달","고슴도치","알파카","앵무새","다람쥐","코알라","라마","기린",
+  "제주도","부산","교토","파리","뉴욕","한강","바다","산","캠핑장","놀이공원","도서관","시장","온천","해외여행",
+  "그림 그리기","노래방","방탈출","보드게임","캠핑","사진 찍기","등산","자전거 타기","베이킹","퍼즐","독서","춤",
+  "봄","여름","가을","겨울","첫눈","벚꽃","단풍","무지개","소나기","은하수",
+  "우주","별자리","무지개색","네온사인","돋보기","우산","텐트","보물상자","촛불","풍선",
+  "설렘","행복한 순간","웃음 참기","깜짝 선물","오늘의 소원","응원하기",
+  "추리 게임","리듬 게임","퀴즈","그림 맞추기","이어말하기","보물찾기","제스처 게임",
+  "붕어빵","호빵","아이스크림","마카롱","크로플","버블티","딸기케이크",
+];
+
+function pickRandomSafeKeywords(count){
+  const existing = new Set(state.keywords.map(kw => kw.text.trim().toLowerCase()));
+  const candidates = SAFE_KEYWORD_POOL.filter(w => !existing.has(w.toLowerCase()));
+  for(let i = candidates.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  return candidates.slice(0, count);
+}
+
+function addRandomKeywords(count){
+  if(!state.isHost) return;
+  const picks = pickRandomSafeKeywords(count);
+  if(picks.length === 0){
+    alert('추가할 수 있는 새로운 추천 키워드가 없어요. (이미 다 등록되어 있어요)');
+    return;
+  }
+  if(picks.length < count){
+    alert(`추천 키워드 중 겹치지 않는 것이 ${picks.length}개뿐이라 ${picks.length}개만 추가했어요.`);
+  }
+  picks.forEach(text => {
+    const id = 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2,6) + Math.floor(Math.random()*1000);
+    db.ref('rooms/' + state.code + '/keywords/' + id).set(text);
+  });
+  touchActivity();
+}
+
+function setNoDuplicate(val){
+  if(!state.isHost) return;
+  db.ref('rooms/' + state.code + '/noDuplicate').set(val);
+  touchActivity();
+}
+
+function resetUsed(){
+  if(!state.isHost) return;
+  db.ref('rooms/' + state.code + '/usedIds').set({});
+  touchActivity();
+}
+
+function renderKeywordList(){
+  const list = el('kw-list');
+  list.innerHTML = '';
+  if(state.keywords.length === 0){
+    list.innerHTML = '<li class="empty-kw">아직 등록된 키워드가 없어요.</li>';
+    return;
+  }
+  state.keywords.forEach((kw, i) => {
+    const li = document.createElement('li');
+    li.className = 'kw-item' + (state.noDuplicate && state.usedIds[kw.id] ? ' used' : '');
+    const color = WHEEL_COLORS[i % WHEEL_COLORS.length];
+    li.innerHTML = `
+      <div class="kw-item-main">
+        <span class="kw-swatch" style="background:${color}"></span>
+        <span></span>
+      </div>
+    `;
+    li.querySelector('.kw-item-main span:last-child').textContent = kw.text;
+    if(state.isHost){
+      const rm = document.createElement('button');
+      rm.className = 'kw-remove';
+      rm.textContent = '✕';
+      rm.onclick = () => removeKeyword(kw.id);
+      li.appendChild(rm);
+    }
+    list.appendChild(li);
+  });
+}
+
+/* =========================================================
+   10) 휠 렌더링 (SVG)
+   ========================================================= */
+function polar(cx, cy, r, angleDeg){
+  const rad = (angleDeg - 90) * Math.PI / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+function arcPath(cx, cy, r, startAngle, endAngle){
+  const start = polar(cx, cy, r, startAngle);
+  const end = polar(cx, cy, r, endAngle);
+  const largeArc = (endAngle - startAngle) > 180 ? 1 : 0;
+  return `M ${cx} ${cy} L ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)} Z`;
+}
+function escapeXml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderWheel(){
+  const svg = el('wheel-svg');
+  const n = state.keywords.length;
+  el('wheel-empty-note').classList.toggle('hidden', n > 0);
+  el('btn-spin').disabled = n < 2;
+
+  if(n === 0){ svg.innerHTML = ''; return; }
+  if(n === 1){
+    svg.innerHTML = `<circle cx="200" cy="200" r="196" fill="${WHEEL_COLORS[0]}"/>
+      <text x="200" y="110" text-anchor="middle" dominant-baseline="middle"
+        font-size="20" font-weight="700" fill="#120E1E" font-family="Pretendard">${escapeXml(state.keywords[0].text)}</text>`;
+    return;
+  }
+
+  const segAngle = 360 / n;
+  const fontSize = Math.max(9, 16 - n * 0.35);
+  let paths = '';
+  let labels = '';
+
+  state.keywords.forEach((kw, i) => {
+    const startA = i * segAngle;
+    const endA = startA + segAngle;
+    const midA = startA + segAngle / 2;
+    const color = WHEEL_COLORS[i % WHEEL_COLORS.length];
+    const isUsed = state.noDuplicate && state.usedIds[kw.id];
+    paths += `<path d="${arcPath(200,200,196,startA,endA)}" fill="${color}" opacity="${isUsed ? 0.28 : 1}" stroke="#120E1E" stroke-width="2"/>`;
+
+    const labelR = 122;
+    const pos = polar(200, 200, labelR, midA);
+    let rot = midA;
+    const norm = ((rot % 360) + 360) % 360;
+    if(norm > 90 && norm < 270) rot += 180;
+    const text = kw.text.length > 10 ? kw.text.slice(0,9) + '…' : kw.text;
+    labels += `<text x="${pos.x.toFixed(2)}" y="${pos.y.toFixed(2)}" transform="rotate(${rot.toFixed(2)} ${pos.x.toFixed(2)} ${pos.y.toFixed(2)})"
+      text-anchor="middle" dominant-baseline="middle" font-size="${fontSize}" font-weight="700"
+      fill="#120E1E" opacity="${isUsed ? 0.4 : 1}" font-family="Pretendard">${escapeXml(text)}</text>`;
+  });
+
+  svg.innerHTML = paths + labels;
+}
+
+function buildBulbRing(){
+  const ring = el('bulb-ring');
+  ring.innerHTML = '';
+  const count = 22;
+  for(let i=0;i<count;i++){
+    const b = document.createElement('div');
+    b.className = 'bulb';
+    
+    const angle = (360 / count) * i;
+    const rad = (angle - 90) * (Math.PI / 180);
+    
+    b.style.left = `calc(50% + ${Math.cos(rad) * 50}%)`;
+    b.style.top = `calc(50% + ${Math.sin(rad) * 50}%)`;
+    b.style.transform = 'translate(-50%, -50%)';
+    b.style.animationDelay = (i % 6) * 0.15 + 's';
+    
+    ring.appendChild(b);
+  }
+}
+
+/* =========================================================
+   11) 스핀 로직
+   ========================================================= */
+function spin(){
+  if(!state.isHost || state.spinning) return;
+  const n = state.keywords.length;
+  if(n < 2){ return; }
+
+  let pool = state.keywords.map((kw, i) => ({ ...kw, index: i }));
+  if(state.noDuplicate){
+    pool = pool.filter(kw => !state.usedIds[kw.id]);
+    if(pool.length === 0){
+      alert('모든 키워드가 이미 나왔어요. "사용 이력 초기화"를 눌러주세요.');
+      return;
+    }
+  }
+  const winner = pool[Math.floor(Math.random() * pool.length)];
+  const spinId = Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+
+  const payload = {
+    spinId,
+    resultIndex: winner.index,
+    totalSegments: n,
+    resultText: winner.text,
+    resultId: winner.id,
+    offsetDeg: (Math.random() - 0.5) * (360 / n) * 0.6,
+  };
+
+  if(state.noDuplicate){
+    db.ref('rooms/' + state.code + '/usedIds/' + winner.id).set(true);
+  }
+  db.ref('rooms/' + state.code + '/spin').set(payload);
+  touchActivity();
+}
+
+function playSpin(spin){
+  state.spinning = true;
+  el('btn-spin').disabled = true;
+  el('reveal-card').classList.add('hidden');
+
+  const svg = el('wheel-svg');
+  const segAngle = 360 / spin.totalSegments;
+  const centerAngle = spin.resultIndex * segAngle + segAngle / 2;
+  const spins = reduceMotion ? 1 : 6;
+  const targetIncrement = spins * 360 + ((360 - centerAngle + spin.offsetDeg) % 360 + 360) % 360;
+  state.myRotation += targetIncrement;
+
+  const duration = reduceMotion ? 500 : 4200;
+  svg.style.transition = `transform ${duration}ms cubic-bezier(0.1,0.7,0.15,1)`;
+  svg.style.transform = `rotate(${state.myRotation}deg)`;
+
+  setTimeout(() => {
+    state.spinning = false;
+    if(state.isHost && state.keywords.length >= 2) el('btn-spin').disabled = false;
+    el('reveal-text').textContent = spin.resultText;
+    el('reveal-card').classList.remove('hidden');
+
+    /* === 로컬 당첨 기록 업데이트 로직 === */
+    const hList = el('history-list');
+    if(hList.querySelector('.empty-kw')) hList.innerHTML = '';
+    const li = document.createElement('li');
+    li.className = 'kw-item';
+    li.style.color = 'var(--gold)';
+    li.style.justifyContent = 'center';
+    li.textContent = spin.resultText;
+    hList.prepend(li);
+    /* ================================== */
+
+  }, duration + 80);
+}
+
+/* =========================================================
+   12) 이벤트 바인딩
+   ========================================================= */
+el('btn-create-room').addEventListener('click', createRoom);
+el('btn-join-room').addEventListener('click', () =>
+  joinRoomByCode(el('join-code-input').value, el('join-password-input').value));
+el('join-code-input').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter') joinRoomByCode(el('join-code-input').value, el('join-password-input').value);
+});
+el('join-password-input').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter') joinRoomByCode(el('join-code-input').value, el('join-password-input').value);
+});
+el('join-code-input').addEventListener('input', (e) => {
+  e.target.value = e.target.value.toUpperCase();
+});
+
+el('kw-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const input = el('kw-input');
+  addKeyword(input.value);
+  input.value = '';
+  input.focus();
+});
+
+el('toggle-noDup').addEventListener('change', (e) => setNoDuplicate(e.target.checked));
+el('btn-reset-used').addEventListener('click', resetUsed);
+el('btn-clear-all').addEventListener('click', clearAllKeywords);
+el('btn-random-one').addEventListener('click', () => addRandomKeywords(1));
+el('btn-random-many').addEventListener('click', () => {
+  const n = Math.max(1, Math.min(30, parseInt(el('random-count-input').value, 10) || 5));
+  addRandomKeywords(n);
+});
+el('btn-spin').addEventListener('click', spin);
+el('btn-leave').addEventListener('click', () => {
+  if(confirm('방에서 나가시겠어요?')) leaveRoom();
+});
+
+el('btn-copy-code').addEventListener('click', async () => {
+  try{
+    await navigator.clipboard.writeText(state.code);
+    const btn = el('btn-copy-code');
+    const old = btn.textContent;
+    btn.textContent = '복사됨!';
+    setTimeout(() => btn.textContent = old, 1200);
+  }catch(e){ alert('복사에 실패했어요. 코드: ' + state.code); }
+});
+
+el('btn-copy-invite').addEventListener('click', async () => {
+  const url = new URL(location.href);
+  url.search = '';
+  url.searchParams.set('room', state.code);
+  if(state.password) url.searchParams.set('pw', state.password);
+  try{
+    await navigator.clipboard.writeText(url.toString());
+    const btn = el('btn-copy-invite');
+    const old = btn.textContent;
+    btn.textContent = '복사됨!';
+    setTimeout(() => btn.textContent = old, 1200);
+    if(state.password){
+      alert('비밀번호까지 포함된 링크예요. 방송 화면 등 공개된 곳에는 올리지 말고, 참가자에게 개인적으로만 전달해주세요.');
+    }
+  }catch(e){ alert('복사에 실패했어요. 링크: ' + url.toString()); }
+});
+
+window.addEventListener('beforeunload', () => {
+  if(presenceRef) presenceRef.remove();
+});
+
+(function handleInviteLink(){
+  const params = new URLSearchParams(location.search);
+  const roomParam = params.get('room');
+  if(!roomParam) return;
+  el('join-code-input').value = roomParam.toUpperCase();
+  const pwParam = params.get('pw');
+  if(pwParam){
+    el('join-password-row').classList.remove('hidden');
+    el('join-password-input').value = pwParam;
+  }
+  if(db) joinRoomByCode(roomParam, pwParam || '');
+})();
+</script>
+</body>
+</html>
